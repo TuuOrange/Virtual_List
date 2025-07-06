@@ -4,7 +4,149 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>固定大小的虚拟列表简写方法</title>
+    <style>
+      .container {
+        width: 600px;
+        height: 500px;
+        border: 1px solid #000;
+        margin: 150px auto;
+      }
+      .virtuallist-container {
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+      }
+      .virtuallist-list-item {
+        width: 100%;
+        height: 100px;
+        border: 1px solid #e3f;
+        box-sizing: border-box;
+        text-align: center;
+        line-height: 100px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+    </style>
   </head>
-  <body></body>
+  <body>
+    <div class="container">
+      <div class="virtuallist-container">
+        <div class="virtuallist-list">
+          <!-- 动态渲染 -->
+          <!-- <div class="virtuallist-list-item"></div> -->
+        </div>
+      </div>
+    </div>
+
+    <script>
+      class Virtuallist {
+        constructor(containerSelector, listSelector) {
+          this.state = {
+            // 数据
+            dataSource: [],
+            itemHeight: 100,
+            viewHeight: 0,
+            maxCount: 0,
+          };
+          this.startIndex = 0;
+          this.endIndex = 0;
+          this.renderList = []; // 渲染的数组内容
+          this.scrollStyle = {}; // 滚动的虚拟效果
+
+          this.domContainer = document.querySelector(containerSelector);
+          this.domList = document.querySelector(listSelector);
+        }
+
+        init() {
+          // 计算
+          this.state.viewHeight = this.domContainer.offsetHeight;
+          this.state.maxCount = Math.ceil(this.state.viewHeight / this.state.itemHeight) + 1;
+
+          this.addData();
+          this.render();
+          this.bindEvent();
+        }
+
+        bindEvent() {
+          this.domContainer.addEventListener("scroll", this.rafThrottle(this.handleScroll.bind(this)));
+        }
+
+        computedEndIndex() {
+          // 计算底部index
+          const end = this.startIndex + this.state.maxCount;
+          this.endIndex = this.state.dataSource[end] ? end : this.state.dataSource.length;
+
+          if (this.endIndex >= this.state.dataSource.length) {
+            this.addData();
+            this.render();
+          }
+        }
+
+        computedRenderList() {
+          this.renderList = this.state.dataSource.slice(this.startIndex, this.endIndex);
+        }
+
+        computedScrollStyle() {
+          // 滚动数据 实现滚动效果
+          this.scrollStyle = {
+            height: `${this.state.dataSource.length * this.state.itemHeight - this.state.itemHeight * this.startIndex}px`,
+            transform: `translate3d(0, ${this.startIndex * this.state.itemHeight}px, 0)`,
+          };
+        }
+
+        handleScroll() {
+          const { scrollTop } = this.domContainer;
+          this.startIndex = Math.floor(scrollTop / this.state.itemHeight); // 向下取整 （滚动到第几个了）
+          this.render();
+        }
+
+        render() {
+          this.computedEndIndex();
+          this.computedRenderList();
+          this.computedScrollStyle();
+          const template = this.renderList.map((i) => `<div class="virtuallist-list-item">${i}</div>`).join("");
+          this.domList.innerHTML = template;
+          this.domList.style.height = this.scrollStyle.height;
+          this.domList.style.transform = this.scrollStyle.transform;
+        }
+
+        addData() {
+          for (let index = 0; index < 10; index++) {
+            const len = this.state.dataSource.length;
+            this.state.dataSource.push(len + 1);
+          }
+        }
+
+        /**
+         * 节流
+         */
+        throttle(fn, delay) {
+          let start = 0;
+          return function (...args) {
+            const now = Date.now();
+            if (now - start >= delay) {
+              fn.apply(this, args);
+              start = now;
+            }
+          };
+        }
+
+        rafThrottle(fn) {
+          let lock = false;
+          return function (...args) {
+            window.requestAnimationFrame(() => {
+              if (lock) return;
+              lock = true;
+              fn.apply(this, args);
+              lock = false;
+            });
+          };
+        }
+      }
+
+      const virtuallist = new Virtuallist(".virtuallist-container", ".virtuallist-list");
+      virtuallist.init();
+    </script>
+  </body>
 </html>
